@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <title>Reddit Stories</title>
+    <style>
+        body { background-color: #f5f6fa; font-family: 'Arial', sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1300px; margin: 20px auto; padding: 20px; }
+        h1 { text-align: center; color: #6c5ce7; font-size: 2.3em; margin-bottom: 25px; text-transform: uppercase; }
+        .filter-form { background-color: #dfe6e9; padding: 20px; border-radius: 15px; margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-form label, .filter-form select, .filter-form input { margin: 5px; padding: 10px; font-size: 1.1em; border: 1px solid #ced6e0; border-radius: 5px; }
+        .filter-form input[type="submit"] { background-color: #6c5ce7; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 12px 25px; font-weight: bold; }
+        .filter-form input[type="submit"]:hover { background-color: #5b4de5; }
+        .story-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 30px; padding: 20px; }
+        .story-card { background-color: white; border-radius: 15px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); padding: 25px; transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; word-wrap: break-word; }
+        .story-card:hover { transform: translateY(-10px); box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+        .story-title { font-size: 1.6em; color: #e74c3c; margin-bottom: 15px; font-weight: bold; }
+        .story-detail { font-size: 1.1em; color: #636e72; margin: 8px 0; line-height: 1.5; }
+        .story-link a { color: #6c5ce7; text-decoration: none; font-weight: bold; word-break: break-all; }
+        .story-link a:hover { text-decoration: underline; }
+        .copy-button { background-color: #6c5ce7; color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-left: 10px; }
+        .copy-button:hover { background-color: #5b4de5; }
+        .no-stories { color: #e74c3c; text-align: center; font-size: 1.3em; padding: 20px; background-color: #fff; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        @media (max-width: 600px) { .story-grid { grid-template-columns: 1fr; } .filter-form { flex-direction: column; align-items: center; } .filter-form label, .filter-form select, .filter-form input { width: 100%; } }
+    </style>
+    <script>
+        function copyToClipboard(elementId) {
+            var text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(() => alert("Copied to clipboard!"), () => alert("Failed to copy!"));
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-Time গল্পের তালিকা</h1>
+        {% if error %}
+            <p style="color: #e74c3c; text-align: center;">{{ error }}</p>
+        {% else %}
+            <p>আপডেট করা হয়েছে: {{ fetched_date }}</p>
+            <form method="POST" class="filter-form">
+                <label for="category">Category:</label>
+                <select name="category" id="category">
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>r/{{ cat }}</option>
+                    {% endfor %}
+                </select>
+                <label for="date_range">Date Range:</label>
+                <select name="date_range" id="date_range">
+                    <option value="today" {% if date_range == 'today' %}selected{% endif %}>Today</option>
+                    <option value="weekly" {% if date_range == 'weekly' %}selected{% endif %}>Weekly</option>
+                    <option value="monthly" {% if date_range == 'monthly' %}selected{% endif %}>Monthly</option>
+                </select>
+                <label for="min_votes">Min Votes (1000+):</label>
+                <input type="number" name="min_votes" id="min_votes" value="{{ min_votes }}" min="1000">
+                <label for="min_comments">Min Comments (100+):</label>
+                <input type="number" name="min_comments" id="min_comments" value="{{ min_comments }}" min="100">
+                <label for="min_words">Min Words:</label>
+                <input type="number" name="min_words" id="min_words" value="{{ min_words }}" min="0">
+                <input type="submit" value="Filter">
+            </form>
+            <div class="story-grid">
+                {% if stories %}
+                    {% for story in stories %}
+                    <div class="story-card">
+                        <div class="story-title">Story #{{ loop.index }}:</div>
+                        <div class="story-detail">Title: <strong>{{ story.title }}</strong></div>
+                        <div class="story-detail">Votes: {{ story.score }}</div>
+                        <div class="story-detail">Comments: {{ story.comments }}</div>
+                        <div class="story-detail">Link: <span class="story-link"><a href="{{ story.url }}" target="_blank">{{ story.url }}</a></span></div>
+                        <div class="story-detail" id="story-{{ loop.index }}">Summary (100 words): <br>{{ story.content|truncate(100, True, '...') }}</div>
+                        <button class="copy-button" onclick="copyToClipboard('full-story-{{ loop.index }}')">Copy Full Story</button>
+                        <div class="story-detail" id="full-story-{{ loop.index }}" style="display:none;">Full Story: <br>{{ story.content }}</div>
+                        <div class="story-detail">Score: {{ story.ai_scoring.overall_score }}/10</div>
+                        <div class="story-detail">Quality: {{ story.ai_scoring.story_quality }}/10</div>
+                        <div class="story-detail">Viral Potential: {{ story.ai_scoring.viral_potential }}/10</div>
+                        <div class="story-detail">Engagement: {{ story.ai_scoring.audience_engagement }}/10</div>
+                        <div class="story-detail">Drama: {{ story.ai_scoring.drama_level }}/10</div>
+                        <div class="story-detail">Comment Engagement: {{ story.ai_scoring.comment_engagement }}/10</div>
+                        <div class="story-detail">Comment Sentiment: {{ story.ai_scoring.comment_sentiment }}/10</div>
+                        <div class="story-detail">Satisfaction: {{ story.ai_scoring.satisfaction_score }}/10</div>
+                        <div class="story-detail">Category: r/{{ story.category }}</div>
+                        <div class="story-detail">YouTube Title: {{ story.youtube_seo.title }}</div>
+                        <div class="story-detail" id="youtube-desc-{{ loop.index }}">Description: <br>{{ story.youtube_seo.description }}</div>
+                        <button class="copy-button" onclick="copyToClipboard('youtube-desc-{{ loop.index }}')">Copy Description</button>
+                        <div class="story-detail">Tags: {{ ', '.join(story.youtube_seo.tags) }}</div>
+                        <div class="story-detail" id="youtube-tags-{{ loop.index }}" style="display:none;">Tags: {{ ', '.join(story.youtube_seo.tags) }}</div>
+                        <button class="copy-button" onclick="copyToClipboard('youtube-tags-{{ loop.index }}')">Copy Tags</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="no-stories">কোনো গল্প পাওয়া যায়নি। VPN চেক করুন বা পরে চেষ্টা করুন।</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
